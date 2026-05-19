@@ -294,9 +294,33 @@ def report_path(path: str, root_dir: str) -> str:
     return relative_path.replace(os.sep, "/")
 
 
+def build_bson_type_pattern(value: str) -> re.Pattern[str]:
+    escaped_value = re.escape(value)
+    enum_name = re.sub(r"(?<!^)(?=[A-Z])", "_", value).upper()
+    enum_aliases = {enum_name}
+    if value == "regex":
+        enum_aliases.add("REGULAR_EXPRESSION")
+    enum_pattern = "|".join(sorted(re.escape(alias) for alias in enum_aliases))
+
+    return re.compile(
+        rf"""
+        (?:
+            (?:["']?(?:\$type|bsonType)["']?\s*[:=]\s*["']{escaped_value}["'])
+            |
+            (?:\bBsonType\.({enum_pattern})\b)
+        )
+        """,
+        re.IGNORECASE | re.VERBOSE,
+    )
+
+
 def build_patterns(items: Sequence[UnsupportedItem]) -> Dict[UnsupportedItem, re.Pattern[str]]:
     patterns: Dict[UnsupportedItem, re.Pattern[str]] = {}
     for item in items:
+        if item.category == "bson_types":
+            patterns[item] = build_bson_type_pattern(item.value)
+            continue
+
         escaped = re.escape(item.value)
         if item.value.startswith("$"):
             pattern = re.compile(rf"(?<!\\w){escaped}(?!\\w)")
