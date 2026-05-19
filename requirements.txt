@@ -1,0 +1,1 @@
+markdown-pdf>=1.7
