@@ -314,11 +314,29 @@ def build_bson_type_pattern(value: str) -> re.Pattern[str]:
     )
 
 
+def build_command_pattern(value: str) -> re.Pattern[str]:
+    escaped_value = re.escape(value)
+    return re.compile(
+        rf"""
+        (?:
+            \b(?:db\.)?(?:command|runCommand|adminCommand)\s*\(\s*\{{\s*["']?{escaped_value}["']?\s*:
+            |
+            \{{\s*["']?{escaped_value}["']?\s*:\s*[^}}\n]+}}
+        )
+        """,
+        re.IGNORECASE | re.VERBOSE,
+    )
+
+
 def build_patterns(items: Sequence[UnsupportedItem]) -> Dict[UnsupportedItem, re.Pattern[str]]:
     patterns: Dict[UnsupportedItem, re.Pattern[str]] = {}
     for item in items:
         if item.category == "bson_types":
             patterns[item] = build_bson_type_pattern(item.value)
+            continue
+
+        if item.category == "commands":
+            patterns[item] = build_command_pattern(item.value)
             continue
 
         escaped = re.escape(item.value)
