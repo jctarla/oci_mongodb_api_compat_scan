@@ -289,6 +289,11 @@ def iter_source_files(root_dir: str, exclude_dirs: Set[str], include_extensions:
                 yield path
 
 
+def report_path(path: str, root_dir: str) -> str:
+    relative_path = os.path.relpath(path, root_dir)
+    return relative_path.replace(os.sep, "/")
+
+
 def build_patterns(items: Sequence[UnsupportedItem]) -> Dict[UnsupportedItem, re.Pattern[str]]:
     patterns: Dict[UnsupportedItem, re.Pattern[str]] = {}
     for item in items:
@@ -336,7 +341,7 @@ def scan_codebase(
                 file_hits[item] = count
 
         if file_hits:
-            findings[path] = file_hits
+            findings[report_path(path, root_dir)] = file_hits
 
         file_driver_hits: Dict[DriverSignature, int] = {}
         for signature, pattern in driver_patterns.items():
@@ -344,7 +349,7 @@ def scan_codebase(
             if count > 0:
                 file_driver_hits[signature] = count
         if file_driver_hits:
-            driver_findings[path] = file_driver_hits
+            driver_findings[report_path(path, root_dir)] = file_driver_hits
 
     return findings, driver_findings, files_scanned
 
@@ -512,7 +517,7 @@ def build_markdown_report_lines(
     else:
         for path in sorted(findings.keys()):
             hits = findings[path]
-            lines.append(f"### `{path}`")
+            lines.append(f"### {path}")
             lines.append("")
             lines.append(f"- Total incompatibilities in file: `{sum(hits.values())}`")
             lines.append("")
@@ -542,7 +547,7 @@ def build_markdown_report_lines(
     else:
         for path in sorted(driver_findings.keys()):
             hits = driver_findings[path]
-            lines.append(f"### `{path}`")
+            lines.append(f"### {path}")
             lines.append("")
             lines.append(f"- Total driver references in file: `{sum(hits.values())}`")
             lines.append("")
