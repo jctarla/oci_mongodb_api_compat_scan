@@ -13,6 +13,7 @@ import os
 import re
 import sys
 import tempfile
+import time
 from dataclasses import dataclass
 from typing import Dict, List, Sequence, Set, Tuple
 
@@ -289,6 +290,15 @@ def iter_source_files(root_dir: str, exclude_dirs: Set[str], include_extensions:
                 yield path
 
 
+def collect_source_files(
+    root_dir: str,
+    exclude_dirs: Set[str],
+    include_extensions: Set[str],
+    include_all_text_files: bool,
+) -> List[str]:
+    return list(iter_source_files(root_dir, exclude_dirs, include_extensions, include_all_text_files))
+
+
 def report_path(path: str, root_dir: str) -> str:
     relative_path = os.path.relpath(path, root_dir)
     return relative_path.replace(os.sep, "/")
@@ -361,20 +371,34 @@ def scan_codebase(
     exclude_dirs: Set[str],
     include_extensions: Set[str],
     include_all_text_files: bool,
+    show_progress: bool = False,
 ) -> Tuple[Dict[str, Dict[UnsupportedItem, int]], Dict[str, Dict[DriverSignature, int]], int]:
     patterns = build_patterns(unsupported_items)
     driver_patterns = build_driver_patterns(DRIVER_SIGNATURES)
     findings: Dict[str, Dict[UnsupportedItem, int]] = {}
     driver_findings: Dict[str, Dict[DriverSignature, int]] = {}
     files_scanned = 0
+    source_files = collect_source_files(root_dir, exclude_dirs, include_extensions, include_all_text_files)
+    total_files = len(source_files)
 
-    for path in iter_source_files(root_dir, exclude_dirs, include_extensions, include_all_text_files):
+    if show_progress:
+        print(f"Files to scan: {total_files}")
+    last_progress_time = time.monotonic()
+
+    for path in source_files:
         files_scanned += 1
         try:
             with open(path, "r", encoding="utf-8", errors="ignore") as fh:
                 content = fh.read()
         except OSError:
             continue
+
+        if show_progress:
+            now = time.monotonic()
+            if files_scanned == total_files or files_scanned % 100 == 0 or now - last_progress_time >= 5:
+                percent = (files_scanned / total_files * 100) if total_files else 100
+                print(f"Files scanned: {files_scanned}/{total_files} ({percent:.1f}%)")
+                last_progress_time = now
 
         file_hits: Dict[UnsupportedItem, int] = {}
         for item, pattern in patterns.items():
@@ -730,6 +754,11 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         default=[],
         help="Additional directory names to exclude from recursive scan.",
     )
+    parser.add_argument(
+        "--progress",
+        action="store_true",
+        help="Print scan progress while processing large directories.",
+    )
     return parser.parse_args(argv)
 
 
@@ -757,6 +786,7 @@ def main(argv: Sequence[str]) -> int:
         exclude_dirs=exclude_dirs,
         include_extensions=include_extensions,
         include_all_text_files=args.include_all_text_files,
+        show_progress=args.progress,
     )
 
     print_human_report(
