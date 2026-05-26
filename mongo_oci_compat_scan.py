@@ -341,7 +341,7 @@ def build_patterns(items: Sequence[UnsupportedItem]) -> Dict[UnsupportedItem, re
 
         escaped = re.escape(item.value)
         if item.value.startswith("$"):
-            pattern = re.compile(rf"(?<!\\w){escaped}(?!\\w)")
+            pattern = re.compile(rf"(?<!\w){escaped}(?!\w)")
         else:
             pattern = re.compile(rf"(?<![A-Za-z0-9_]){escaped}(?![A-Za-z0-9_])")
         patterns[item] = pattern
