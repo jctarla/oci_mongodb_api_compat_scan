@@ -192,7 +192,6 @@ DEFAULT_INCLUDE_EXTENSIONS = {
     ".properties",
     ".env",
     ".txt",
-    ".md",
     ".sh",
     ".zsh",
 }
@@ -252,6 +251,12 @@ DRIVER_SIGNATURES: List[DriverSignature] = [
     DriverSignature("ruby_mongoid", "review", "ODM on top of Ruby Mongo driver", r"(?im)^\s*gem\s+['\"]mongoid['\"]"),
     DriverSignature("python_mongomock", "incompatible", "Mock driver (testing only)", r"(?im)^\s*mongomock([<>=!~].*)?$"),
 ]
+
+AMBIGUOUS_COMMAND_NAMES = {
+    "features",
+    "split",
+    "top",
+}
 
 
 def load_unsupported_items() -> Tuple[List[UnsupportedItem], str]:
@@ -326,15 +331,37 @@ def build_bson_type_pattern(value: str) -> re.Pattern[str]:
 
 def build_command_pattern(value: str) -> re.Pattern[str]:
     escaped_value = re.escape(value)
+    direct_object_pattern = ""
+    if value not in AMBIGUOUS_COMMAND_NAMES:
+        direct_object_pattern = rf'|\{{\s*["\']?{escaped_value}["\']?\s*:\s*[^}}\n]+}}'
+
     return re.compile(
         rf"""
         (?:
             \b(?:db\.)?(?:command|runCommand|adminCommand)\s*\(\s*\{{\s*["']?{escaped_value}["']?\s*:
-            |
-            \{{\s*["']?{escaped_value}["']?\s*:\s*[^}}\n]+}}
+            {direct_object_pattern}
         )
         """,
         re.IGNORECASE | re.VERBOSE,
+    )
+
+
+def build_index_option_pattern(value: str) -> re.Pattern[str]:
+    escaped_value = re.escape(value)
+    option_key = rf'["\']?{escaped_value}["\']?\s*:'
+    return re.compile(
+        rf"""
+        (?:
+            \b(?:createIndex|createIndexes|ensureIndex)\s*\(.{{0,2000}}?{option_key}
+            |
+            \b(?:schema|Schema|modelSchema|collection)\.index\s*\(.{{0,2000}}?{option_key}
+            |
+            \.index\s*\(\s*\{{.{{0,1000}}?\}}\s*,\s*\{{.{{0,1000}}?{option_key}
+            |
+            \bcreateIndexes\b.{{0,2000}}?\bindexes\b.{{0,2000}}?{option_key}
+        )
+        """,
+        re.IGNORECASE | re.DOTALL | re.VERBOSE,
     )
 
 
@@ -347,6 +374,10 @@ def build_patterns(items: Sequence[UnsupportedItem]) -> Dict[UnsupportedItem, re
 
         if item.category == "commands":
             patterns[item] = build_command_pattern(item.value)
+            continue
+
+        if item.category == "index_options":
+            patterns[item] = build_index_option_pattern(item.value)
             continue
 
         escaped = re.escape(item.value)

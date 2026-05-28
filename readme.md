@@ -83,7 +83,7 @@ Scan the included sample application:
 By default, the scanner:
 
 - recursively scans the target directory
-- includes common source, config, and documentation extensions
+- includes common source and config extensions
 - skips directories such as `.git`, `node_modules`, `vendor`, `dist`, `build`, `target`, virtual environments, and cache folders
 - counts every textual occurrence of each unsupported item
 - keeps the target directory read-only during scanning
